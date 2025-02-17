@@ -4,6 +4,7 @@ import requests
 import re
 from ebooklib import epub
 import time
+import selenium
 start_time = time.time()
 header = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"}
 
@@ -28,6 +29,7 @@ def next_chap(url):
     response = requests.get(url,headers=header)
 
     soup = BeautifulSoup(response.text,"html.parser")
+    print(response.status_code)
     next_chap_url = soup.find("a",id="next_chap")["href"]
     time.sleep(2)
     get_chapter_content(url)
