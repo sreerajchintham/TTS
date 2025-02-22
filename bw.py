@@ -4,6 +4,7 @@ import random
 import cloudscraper
 import time
 
+get_chapter_content_list =  []
 start_time = time.time()
 headers = [
 {
@@ -45,8 +46,15 @@ headers = [
 }
 ]
 
+
 session = requests.Session()
-header = random.choice(headers)
+
+
+url = "https://www.proxy-list.download/api/v1/get?type=http"
+response = requests.get(url)
+proxies = response.text.split("\r\n")
+proxies = ["http://" + proxy for proxy in proxies if proxy]
+
 
 def novel_url(input):
     search_url = f"https://novelbin.me/search?keyword=" + "+".join(input.split(" "))
@@ -55,24 +63,31 @@ def novel_url(input):
 
 
 def get_response_and_content(url):
+    
     retries = 6
     try:
         scraper = cloudscraper.create_scraper()
         response = scraper.get(url)
         if response.status_code == 200:
-            print(f"Everything is working fine{response.status_code}")
+            print(f"Everything is working fine. response code - {response.status_code}")
+            soup = BeautifulSoup(response.text,"html.parser")
+
         elif response.status_code == 429:
             print("429 elif")
             for i in range(5):
+                header = random.choice(headers)
                 print("429 for loop")
                 time.sleep(random.uniform(1.0,5.0))
                 response = scraper.get(url)
+
                 if not response:
+                    
                     print("429 nest if not")
                     continue
                     
                 else:
                     print("429 nested else")
+
                     break
         else:
             print(f"RESPONSE CODE{response.status_code}")
@@ -93,15 +108,22 @@ def get_response_and_content(url):
 
     soup = BeautifulSoup(response.text,"html.parser")
     return soup
+def get_chapter_content(url):
+    scraper = cloudscraper.create_scraper()
+    response = scraper.get(url)
+    soup = BeautifulSoup(response.text,"html.parser")
+    novel_title = soup.find("div",class_ ="novel-title")
+    chapter_content = soup.find("div",class_ = "chr-c")
 
-
+    global chapter_content_list
+    get_chapter_content_list.append(chapter_content)
+    return chapter_content
 def get_homepage_url(search_url):
     soup = get_response_and_content(search_url)
     
     homepage_url = soup.find("h3",class_="novel-title")
-    print(homepage_url)
+
     homepage_url = homepage_url.find("a")["href"]
-    print(homepage_url)
     return homepage_url
 def get_first_chap_url(home_page_url):
     soup = get_response_and_content(home_page_url)
@@ -127,14 +149,14 @@ def prev_chap(chap_url):
 
 
     except :
-        return
+        return "Prev chap not found"
     return prev_chap
 
 
-def chap_list(homepage_url):
-    soup = get_response_and_content(homepage_url)
-    chap_list = soup.find_all("a",href = True)
-    print(chap_list)
+# def chap_list(homepage_url):
+#     soup = get_response_and_content(homepage_url)
+#     chap_list = soup.find_all("a",href = True)
+#     print(chap_list)
 
 
 
@@ -151,7 +173,8 @@ latest_chap_url = latest_chap(search_url)
 temp_chap = latest_chap_url
 while temp_chap:
     print(temp_chap)
+    get_chapter_content(temp_chap)
     temp_chap = prev_chap(temp_chap)
-    
+print(get_chapter_content_list)
 stop_time = time.time()
 print(f"Total time elapsed is {(stop_time - start_time)//60} minutes and {(stop_time -start_time)%60} seconds")
