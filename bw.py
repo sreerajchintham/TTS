@@ -3,8 +3,10 @@ from bs4 import BeautifulSoup
 import random
 import cloudscraper
 import time
+from ebooklib import epub
 
 get_chapter_content_list =  []
+get_novel_title = ""
 start_time = time.time()
 headers = [
 {
@@ -49,13 +51,24 @@ headers = [
 
 session = requests.Session()
 
+# def get_proxy():
+#     url = "https://www.free-proxy-list.net/"
+#     response = requests.get(url)
+#     soup = BeautifulSoup(response.text, "html.parser")
+#     proxy_list = []
+#     for row in soup.find("table", {"id": "proxylisttable"}).find_all("tr")[1:]:
+#         columns = row.find_all("td")
+#         ip = columns[0].text
+#         port = columns[1].text
+#         proxy_list.append(f"http://{ip}:{port}")
 
-url = "https://www.proxy-list.download/api/v1/get?type=http"
-response = requests.get(url)
-proxies = response.text.split("\r\n")
-proxies = ["http://" + proxy for proxy in proxies if proxy]
-
-
+#     print(proxy_list)
+#     # proxies = response.text.split("\r\n")
+#     # proxies = ["http://" + proxy for proxy in proxies if proxy]
+#     proxy = random.choice(proxy_list)
+#     proxy_dict = {"http": proxy, "https": proxy}
+#     print(proxy_dict)
+#     return proxy_dict
 def novel_url(input):
     search_url = f"https://novelbin.me/search?keyword=" + "+".join(input.split(" "))
     return search_url
@@ -67,6 +80,7 @@ def get_response_and_content(url):
     retries = 6
     try:
         scraper = cloudscraper.create_scraper()
+        # proxy_dict = get_proxy()
         response = scraper.get(url)
         if response.status_code == 200:
             print(f"Everything is working fine. response code - {response.status_code}")
@@ -112,8 +126,11 @@ def get_chapter_content(url):
     scraper = cloudscraper.create_scraper()
     response = scraper.get(url)
     soup = BeautifulSoup(response.text,"html.parser")
+    global novel_title
     novel_title = soup.find("div",class_ ="novel-title")
+
     chapter_content = soup.find("div",class_ = "chr-c")
+    novel_text = "\n".join([p.text for p in chapter_content.find_all("p")])
 
     global chapter_content_list
     get_chapter_content_list.append(chapter_content)
@@ -149,7 +166,7 @@ def prev_chap(chap_url):
 
 
     except :
-        return "Prev chap not found"
+        return
     return prev_chap
 
 
@@ -158,7 +175,30 @@ def prev_chap(chap_url):
 #     chap_list = soup.find_all("a",href = True)
 #     print(chap_list)
 
+def create_epub(novel_title, chapters):
+    book = epub.EpubBook()
 
+    # Set metadata
+    book.set_identifier('000001')
+    book.set_title(novel_title)
+    book.set_language('en')
+    book.add_author('Unknown')
+
+    epub_chapter =  []
+
+    for i ,(title,content) in enumerate(chapters):
+        chapter = epub.EpubHtml(title=title, file_name=f'chap_{i+1}.xhtml', lang='en')
+        chapter.content = f"<h1>{title}</h1><p>{content}</p>"
+        book.add_item(chapter)
+        epub_chapter.append(chapter)
+
+    book.toc = epub_chapter
+
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    book.spine = ['nav'] + epub_chapter
+    epub.write_epub(f"{novel_title}.epub", book,{})
+    print("epud created successfully")
 
 serch_word = input("Enter : ")
 search_url = novel_url(serch_word)
@@ -174,7 +214,9 @@ temp_chap = latest_chap_url
 while temp_chap:
     print(temp_chap)
     get_chapter_content(temp_chap)
+
     temp_chap = prev_chap(temp_chap)
-print(get_chapter_content_list)
+create_epub(novel_title=novel_title,chapters=get_chapter_content_list[::-1])
+
 stop_time = time.time()
 print(f"Total time elapsed is {(stop_time - start_time)//60} minutes and {(stop_time -start_time)%60} seconds")
